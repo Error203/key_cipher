@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 from Crypto.Cipher import Salsa20
 from Crypto.Util.Padding import pad
+from sys import platform as current_platform
 import argparse
 import getpass
 import os
 import random
 import qlogger
 import string
+import subprocess
 
 parser = argparse.ArgumentParser(description="program simply takes path to ciphered (with Salsa20) key, deciphers it, obfuscates and deltes the unciphered key")
 
@@ -132,8 +134,9 @@ def decipher(path_to_key, password):
 		log.exception(e)
 
 	key_path = obfuscate(decrypted_key)
-	print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * 20)
-	print(key_path + "\n" + "=" * 20)
+	key_path_length = len(key_path)
+	print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
+	print(os.path.abspath(key_path) + "\n" + "=" * key_path_length)
 	try:
 		input()
 	except (KeyboardInterrupt, EOFError):
@@ -150,12 +153,45 @@ def obfuscate(key):
 	for i in range(name_length):
 		name += random.choice(ALPHABET)
 
-	path = "/tmp/" + name
+	tmp_prefix = os.path.expandvars("$TMPDIR")
+	# fix for termux, where there is a var named $TMPDIR, for normal distro use normal path
+	
+	if current_platform.startswith("win"):
+		tmp_prefix = "."
+		# handling windows, even though i doubt it'll work anyways on windows,
+		# dont care to rewrite the whole code and troubleshoot it, maybe later.
+	
+	elif tmp_prefix == "$TMPDIR":
+		tmp_prefix = "/tmp"
 
-	with open(path, "w") as file:
-		file.write(key)
 
-	os.system("chmod 600 " + path)
+	path = os.path.join(tmp_prefix, name)
+
+	log.debug("the path for the file is: '%s'" % path)
+
+	try:
+
+		with open(path, "w") as file:
+			file.write(key)
+
+	except OSError as error:
+		if error.errno == 13:
+			# aka Permission Denied, for some reason?
+			log.info("'%s': Permission denied, trying current directory" % path)
+			with open(name, "w") as file:
+				file.write(key)
+		
+		else:
+			log.exception(error)
+			exit(error.errno)
+
+	except Exception as e:
+		log.exception(error)
+
+	# os.system("chmod 600 " + path)
+
+	subprocess.run(["chmod", "600", path])
+	# for some reason i think this will be more clear
 
 	return path
 
