@@ -95,7 +95,7 @@ def cipher(path_to_key, password):
 	log.debug("ciphering '%s'" % path_to_key)
 
 	password = handle_password(password, False)
-	self.log.debug("password ok")
+	log.debug("password ok")
 
 	key_unciphered = try_open(path_to_key)
 
