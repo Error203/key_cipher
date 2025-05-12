@@ -111,7 +111,7 @@ def cipher(path_to_key, password):
 	with open(path_to_ciphered_key, "wb") as file:
 		file.write(key_ciphered)
 
-	self.log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, path_to_ciphered_key))
+	log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, path_to_ciphered_key))
 
 def decipher(path_to_key, password):
 	log.debug("deciphering '%s'" % path_to_key)
