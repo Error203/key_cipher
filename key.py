@@ -133,6 +133,9 @@ def decipher(path_to_key, password):
 	except Exception as e:
 		log.exception(e)
 
+	else:
+		log.debug("password ok")
+
 	key_path = obfuscate(decrypted_key)
 	key_path_length = len(key_path)
 	print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
@@ -197,7 +200,7 @@ def obfuscate(key):
 
 
 def cleanup(key_path):
-	if os.system("shred " + key_path):
+	if subprocess.run(["shred", key_path]):
 		with open(key_path, "w") as file:
 			file.write(random.randbytes(5000))
 
