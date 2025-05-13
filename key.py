@@ -124,11 +124,15 @@ def decipher(path_to_key, password):
 	key = key_ciphered[8:]
 	decipher = Salsa20.new(pad(password, 16), nonce)
 	try:
-		decrypted_key = decipher.decrypt(key).decode("utf-8")
+		decrypted_key = decipher.decrypt(key).decode("utf-8") if not arguments.bytes else \
+		decipher.decrypt(key)
 
 	except UnicodeDecodeError as e:
 		log.critical("failed to decode (maybe because of incorrect password), program aborted")
-		log.exception(e)
+		# have to add a real checking for password
+		if arguments.verbose:
+			log.exception(e)
+
 		exit(1)
 
 	except Exception as e:
@@ -190,7 +194,7 @@ def obfuscate(key):
 			exit(error.errno)
 
 	except Exception as e:
-		log.exception(error)
+		log.exception(e)
 
 	# os.system("chmod 600 " + path)
 
@@ -201,8 +205,10 @@ def obfuscate(key):
 
 
 def cleanup(key_path):
-	if subprocess.run(["shred", key_path]):
-		with open(key_path, "w") as file:
+	return_code = subprocess.run(["shred", key_path])
+	if return_code:
+		log.debug("return code of shred: %d" % return_code)
+		with open(key_path, "wb") as file:
 			file.write(random.randbytes(5000))
 
 	os.remove(key_path)
