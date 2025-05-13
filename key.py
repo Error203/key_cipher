@@ -205,7 +205,7 @@ def obfuscate(key):
 
 
 def cleanup(key_path):
-	return_code = subprocess.run(["shred", key_path])
+	return_code = subprocess.run(["shred", key_path]).returncode
 	if return_code:
 		log.debug("return code of shred: %d" % return_code)
 		with open(key_path, "wb") as file:
