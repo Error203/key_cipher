@@ -126,8 +126,9 @@ def decipher(path_to_key, password):
 	try:
 		decrypted_key = decipher.decrypt(key).decode("utf-8")
 
-	except UnicodeDecodeError:
-		log.critical("wrong password, program aborted")
+	except UnicodeDecodeError as e:
+		log.critical("failed to decode (maybe because of incorrect password), program aborted")
+		log.exception(e)
 		exit(1)
 
 	except Exception as e:
