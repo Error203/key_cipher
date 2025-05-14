@@ -35,6 +35,8 @@ globdkLen = 32
 # key deriviation length for PBKDF2
 globiterations = 1_000_000
 # iterations for the same reason
+if arguments.output:
+	arguments.output = os.path.expanduser(arguments.output)
 
 # FUCKING MESS
 
@@ -147,7 +149,7 @@ class KeyHandlerVerify:
 			exit(1)
 
 		else:
-			log.info("payload hash ok")
+			log.debug("payload hash ok")
 
 	# FUCKING AWFUL, I KNOW, BUT DONT REALLY CARE FOR NOW
 	def get_key(self):
@@ -281,8 +283,8 @@ def decipher(path_to_key, password):
 	else:
 		log.debug("password ok")
 
-	log.debug("output option: " + arguments.output)
 	if arguments.output:
+		log.debug("output option: " + arguments.output)
 		if arguments.output == '-':
 			if not is_bytes(decrypted_key):
 				sys.stdout.write(decrypted_key)
@@ -339,7 +341,7 @@ def write_key_to_file(path, key):
 		mode = "wb" if arguments.bytes or arguments.cipher else "w"
 
 		with open(path, mode) as file:
-			if arguments.bytes:
+			if arguments.bytes or arguments.cipher:
 				file.write(key if is_bytes(key) else key.ecnode("utf-8"))
 			else:
 				file.write(key if not is_bytes(key) else key.decode("utf-8"))
