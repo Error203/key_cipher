@@ -244,8 +244,7 @@ def cipher(path_to_key, password):
 		if _path == '-':
 			sys.stdout.buffer.write(encrypted_key)
 
-		else:
-			write_key_to_file(_path, encrypted_key)
+	write_key_to_file(_path, encrypted_key)
 
 	log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, _path))
 
