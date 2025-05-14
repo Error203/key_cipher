@@ -1,0 +1,154 @@
+>>> from Crypto.Cipher import Salsa20
+>>> from Crypto.Util.Padding import pad
+>>> from Crypto.Protocol.KDF import PBKDF2
+>>> from Crypto.Hash import SHA256
+>>> password = pad(b"password123", 16)
+>>> len(password)
+16
+>>> impot os
+  File "<stdin>", line 1
+    impot os
+          ^^
+SyntaxError: invalid syntax
+>>> import os
+>>> salt = os.urandom(16)
+>>> nonce = os.urandom(8)
+>>> key = b"SUPER SECRET KEY!!!"
+>>> iterations = 10000000
+>>> dkLen=32
+>>> 256 // 8
+32
+>>> message = key
+>>> key = PBKDF2(password, salt, dkLen=dkLen, count=iterations)
+>>> key
+b'\xf9F\xf8.$]H%i\xe8\xfd\C\xba\xcf\x84i\x01f\xe1(\xa6n\x9c\x96\xd4;8\xa5P\xbe\xc5'
+>>> iterations = iter
+iter(       iterations  
+>>> iterations = iter
+iter(       iterations  
+>>> iterations = iterations // 10
+>>> key = PBKDF2(password, salt, dkLen=dkLen, count=iterations)
+>>> key
+b'E\xea\x12u\x98\x87\x0f\xd1/%B\x91-5\x04p\xfcq\x19\xd1\xd3\xfd\x90\x9c\x18qS\x97\xeb|6\xb8'
+>>> mac_key = PBKDF2(password, salt, dkLen=dkLen, count=iterations, hmac_hash_module=SHA256)
+>>> key
+b'E\xea\x12u\x98\x87\x0f\xd1/%B\x91-5\x04p\xfcq\x19\xd1\xd3\xfd\x90\x9c\x18qS\x97\xeb|6\xb8'
+>>> mac_key
+b'\xdd\x8f\xd7hUiI\xa1\xae)J\xe2\xbaJG\xaeB$\xe1\x11\x9e\x95\x84\x86\xc4W\xa9\xf2D\xd7x\xfc'
+>>> cipher = Salsa20.new(key=key, nonce=nonce)
+>>> cipher.
+cipher.block_size  cipher.decrypt(    cipher.encrypt(    cipher.key_size    cipher.nonce       
+>>> ciphertext = cipher.encrypt(message)
+>>> cipher
+<Crypto.Cipher.Salsa20.Salsa20Cipher object at 0x7f82266ad210>
+>>> ciphertext
+b']0c\xfal\x9c\x7f\x03\xa7\x7f\x89\xf0\xb4\xae\xc2v\x9c\x99n'
+>>> mac_key
+b'\xdd\x8f\xd7hUiI\xa1\xae)J\xe2\xbaJG\xaeB$\xe1\x11\x9e\x95\x84\x86\xc4W\xa9\xf2D\xd7x\xfc'
+>>> import hmac
+>>> hmac.
+hmac.HMAC(            hmac.digest(          hmac.new(             hmac.trans_5C         
+hmac.compare_digest(  hmac.digest_size      hmac.trans_36         
+>>> mac = hmac.new(key, ciphertext, sha256)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'sha256' is not defined. Did you mean: 'SHA256'?
+>>> mac = hmac.new(key, ciphertext, ShA256)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'ShA256' is not defined. Did you mean: 'SHA256'?
+>>> from hashlib import sha256
+>>> mac = hmac.new(key, ciphertext, sha256)
+>>> mac
+<hmac.HMAC object at 0x7f8225224630>
+>>> mac.digest()
+b'\xe0\xe3\xd7\xc3\xfd\xf8\xc3\xf3\x18\xb3\xbb\x95\xf6\x82B4\x91\xd4\x87\xd0y\xa5\xeb\xd4d\xc2\xcf\xd5\x82\xb2\xdb'
+>>> encrypted_data
+b'\x1b\xa6\xbb\xe8\xb2\xf7g\xd0H \x87 \x13d\xcd\xfe\x80\x8c\xc8\xee\xbd\xcb\x8c)]0c\xfal\x9c\x7f\x03\xa7\x7f\x89\xf0\xb4\xae\xc2v\x9c\x99n\xe0\xe3\xd7\xc3\xfd\xf8\xc3\xf3\x18\xb3\xbb\x95\xf6\x82B4\x91\xd4\x87\xd0y\xa5\xeb\xd4d\xc2\xcf\xd5\x82\xb2\xdb'
+>>> password = pad(b"password123", 16)
+>>> password
+b'password123\x05\x05\x05\x05\x05'
+>>> key = PBKDF2(key, salt, kdLen=32, count=100_000)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TypeError: PBKDF2() got an unexpected keyword argument 'kdLen'
+>>> key = PBKDF2(key, salt, dkLen=32, count=100_000)
+>>> key
+b'\x0c]i\xabze\xb0b\xbf4\x07"\x149\xec\x80j?\x98\x0e\xda\x878^\xde!\xdd\x90kKU\x89'
+>>> iterations
+1000000
+>>> key = PBKDF2(password, salt, dkLen=32, count=100_000)
+>>> key
+b'\x8e\xca\x84\x12D\xb7\xc9\xbd\x9f2\xe4\xb2\r\x9b\xe8\x1c}7Y.\xfb\x95\xba\xaa\x87xm\x86\xafbk\x90'
+>>> salt
+b'H \x87 \x13d\xcd\xfe'
+>>> key = PBKDF2(password, salt, dkLen=32, count=iterations)
+>>> key
+b'\x08\xc8\x15\x99\xf7\x83"\x9c\xee\xed*nu7\xd7g91,U8\xf5\x9c\x86\x86p\xff\xfd\xb2\x9b$\x83'
+>>> salt = encrypted_data[8:24]
+>>> encrypted_text = encrypted_data[24:-32]
+>>> salt
+b'H \x87 \x13d\xcd\xfe\x80\x8c\xc8\xee\xbd\xcb\x8c)'
+>>> key = PBKDF2(password, salt, dkLen=32, count=iterations)
+>>> key
+b'E\xea\x12u\x98\x87\x0f\xd1/%B\x91-5\x04p\xfcq\x19\xd1\xd3\xfd\x90\x9c\x18qS\x97\xeb|6\xb8'
+>>> key = PBKDF2(password, salt, dkLen=32, count=100_000)
+>>> key
+b'[7\xd7QG\xba\xe4\xb6xzg\xe8\x16sL[\xba\xef\x0c\x88\xc4\xff\xb6\xb9\x18\x8cS\xb2\x00\xbe\x9f"'
+>>> key = PBKDF2(password, salt, dkLen=32, count=1_000_000)
+>>> key
+b'E\xea\x12u\x98\x87\x0f\xd1/%B\x91-5\x04p\xfcq\x19\xd1\xd3\xfd\x90\x9c\x18qS\x97\xeb|6\xb8'
+>>> hmac.
+hmac.HMAC(            hmac.digest(          hmac.new(             hmac.trans_5C         
+hmac.compare_digest(  hmac.digest_size      hmac.trans_36         
+>>> hmac.
+hmac.HMAC(            hmac.digest(          hmac.new(             hmac.trans_5C         
+hmac.compare_digest(  hmac.digest_size      hmac.trans_36         
+>>> cur_mac = hmac.new(key, encrypted_text, sha256)
+>>> hmac.compare_digest(cur_mac, hmac
+hmac        hmac_value  
+>>> hmac.compare_digest(cur_mac, hmac_value)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TypeError: a bytes-like object is required, not 'HMAC'
+>>> hmac.
+hmac.HMAC(            hmac.digest(          hmac.new(             hmac.trans_5C         
+hmac.compare_digest(  hmac.digest_size      hmac.trans_36         
+>>> hmac.compare_digest(cur_mac.digest(), hmac_value)
+True
+>>> Object
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'Object' is not defined. Did you mean: 'object'?
+>>> object
+<class 'object'>
+>>> decipher = Salsa20
+Salsa20
+>>> decipher = Salsa20.new(key=key, nonce=nonce)
+>>> decrypted_text = decipher.decrypt(cipher
+cipher      ciphertext  
+>>> decrypted_text = decipher.decrypt(encrypted_text)
+>>> decrypted_
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'decrypted_' is not defined. Did you mean: 'decrypted_data'?
+>>> decrypted_text
+b'SUPER SECRET KEY!!!'
+>>> os.urandom(16)
+b'+\x1f\x87!\xe2KHU,\xe1&\xc9\xe0\xa1\xc7\xce'
+>>> os.curdir
+'.'
+>>> os.path.get
+os.path.getatime(  os.path.getctime(  os.path.getmtime(  os.path.getsize(   
+>>> os.path.get
+os.path.getatime(  os.path.getctime(  os.path.getmtime(  os.path.getsize(   
+>>> bytes.
+bytes.capitalize(    bytes.hex(           bytes.istitle(       bytes.partition(     bytes.rsplit(        bytes.translate(
+bytes.center(        bytes.index(         bytes.isupper(       bytes.removeprefix(  bytes.rstrip(        bytes.upper(
+bytes.count(         bytes.isalnum(       bytes.join(          bytes.removesuffix(  bytes.split(         bytes.zfill(
+bytes.decode(        bytes.isalpha(       bytes.ljust(         bytes.replace(       bytes.splitlines(    
+bytes.endswith(      bytes.isascii(       bytes.lower(         bytes.rfind(         bytes.startswith(    
+bytes.expandtabs(    bytes.isdigit(       bytes.lstrip(        bytes.rindex(        bytes.strip(         
+bytes.find(          bytes.islower(       bytes.maketrans(     bytes.rjust(         bytes.swapcase(      
+bytes.fromhex(       bytes.isspace(       bytes.mro()          bytes.rpartition(    bytes.title(         
+

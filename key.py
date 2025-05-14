@@ -1,18 +1,25 @@
 #!/usr/bin/python3
 from Crypto.Cipher import Salsa20
 from Crypto.Util.Padding import pad
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Hash import SHA256
 from sys import platform as current_platform
+from hashlib import sha256
+from collections import namedtuple
 import argparse
 import getpass
 import os
+import sys
 import random
 import qlogger
 import string
 import subprocess
+import hmac
 
 parser = argparse.ArgumentParser(description="program simply takes path to ciphered (with Salsa20) key, deciphers it, obfuscates and deltes the unciphered key")
 
 parser.add_argument("-k", "--key", help="specify path to a ciphered key")
+parser.add_argument("-o", "--output", help="set output file (or '-' for stdout)")
 
 parser.add_argument("-c", "--cipher", help="crypt a key with a password", action="store_true")
 parser.add_argument("-b", "--bytes", help="open a file in a bytes-reading form (not a plain text)", action="store_true")
@@ -25,9 +32,16 @@ PATH = "~/keys/id_rsa.ciphered" if not arguments.key else arguments.key
 PATH = os.path.expanduser(PATH)
 ALPHABET = string.ascii_letters + string.digits
 
+# for debugging the code when its imported
+# written this by mysels, thats why it so shit.
+# OH MY FUCKING GOD ITS SO SHIT, but works for me.
+
+# forget about it, fixed it, now it looks slim and nice. :)
+if __name__ != "__main__":
+	arguments.verbose = True
+
 log = qlogger.Logger(level="debug" if arguments.verbose else "info", color=arguments.no_color).get_logger(os.path.basename(__file__))
 
-# maybe not that safe? i mean converting it to bytes
 
 def get_password(prompt="Password:"):
 	try:
@@ -45,6 +59,90 @@ def get_password(prompt="Password:"):
 
 def confirm_password(password):
 	return get_password("Repeat password:") == password
+
+def is_bytes(value):
+	return isinstance(value, bytes)
+
+# === 	START KEY HANDLING 	===
+
+class KeyHandlerPayload:
+
+	# setting all to None to have an ability to get_key() without supplying extra info
+	def __init__(self, data=None, password=None, nonce=None, salt=None):
+		self.password = password
+		self.dkLen = 32
+		self.iterations = 1_000_000
+		self.nonce = nonce
+		self.salt = salt
+		self.data = data
+
+
+		if not self.salt:
+			log.debug("no salt, generating one")
+			self.salt = os.urandom(16)
+
+		if not self.nonce:
+			log.debug("no nonce, generating one")
+			self.nonce = os.urandom(8)
+
+	# def _get_key_hmac(self):
+	# 	self.key_hmac = PBKDF2(self.password, self.salt, dkLen=self.dkLen, count=self.iterations, hmac_hash_module=SHA256)
+
+		# return self.key_hmac
+
+	def _get_payload_hmac(self):
+		self.payload = self.nonce + self.salt + self.data
+		self.payload_hmac = hmac.new(self.key, self.payload, sha256).digest()
+
+		return self.payload_hmac
+
+	def _get_ready_payload(self):
+		return self.payload + self.payload_hmac
+
+	def get_key(self):
+		self.key = PBKDF2(self.password, self.salt, dkLen=self.dkLen, count=self.iterations)
+		log.debug("key generation ok")
+
+		return self.key
+
+	def get_payload(self):
+		self._get_payload_hmac()
+
+		return self._get_ready_payload()
+
+class KeyHandlerVerify:
+
+	def __init__(self, password, payload):
+		self.password = password
+		self.payload = payload
+
+	def _get_fields(self):
+		self.nonce = self.payload[:8] # for nonce
+		self.salt = self.payload[8:24] # for salt
+		self.read_payload = self.payload[24:-32] # the actual payload
+		self.payload_hmac = self.payload[-32:] # payload hmac
+
+	def verify_payload(self):
+		self._get_fields()
+
+		self.key_handler_payload = KeyHandlerPayload(
+			nonce=self.nonce,
+			data=self.read_payload, 
+			password=self.password, 
+			salt=self.salt
+			)
+
+		self.key = self.key_handler_payload.get_key()
+		self.current_payload_hmac = self.key_handler_payload._get_payload_hmac()
+
+		if not hmac.compare_digest(self.current_payload_hmac, self.payload_hmac):
+			log.critical("wrong password or data is corrupted.")
+			exit(1)
+
+		else:
+			log.info("payload hash ok")
+
+# === 	END KEY HANDLING 	===
 
 def handle_password(password, exit_on_failure=False):
 	try:
@@ -75,10 +173,14 @@ def handle_password(password, exit_on_failure=False):
 		return password
 
 def try_open(path_to_key, read_bytes=False):
-
 	try:
-		with open(path_to_key, "r" if not arguments.bytes and not read_bytes else "rb") as file:
-			data = bytes(file.read(), "utf-8") if not arguments.bytes and not read_bytes else file.read()
+		log.debug("bytes: " + str(arguments.bytes))
+		with open(path_to_key, "r" if not arguments.bytes else "rb") as file:
+			data = bytes(file.read(), "utf-8") if not arguments.bytes else file.read()
+
+	except UnicodeDecodeError:
+		log.critical("file '%s' is bytes, can't decode, use -b for bytes" % path_to_key)
+		exit(1)
 
 	except OSError as error:
 		log.error(error)
@@ -104,14 +206,18 @@ def cipher(path_to_key, password):
 	key_ciphered = None
 	# it's the key that will be encrypted
 
-	cipher = Salsa20.new(key=pad(password, 16))
-	nonce = cipher.nonce
-	key_ciphered = nonce + cipher.encrypt(key_unciphered)
+	key_handler = KeyHandlerPayload(password=password)
+
+	cipher = Salsa20.new(key=key_handler.get_key(), nonce=key_handler.nonce)
+	key_ciphered = cipher.encrypt(key_unciphered)
+
+	key_handler.data = key_ciphered
+	# fucking ugly, but let it be.
 
 	# no error checking, will do later
 	path_to_ciphered_key = path_to_key + ".ciphered"
 	with open(path_to_ciphered_key, "wb") as file:
-		file.write(key_ciphered)
+		file.write(key_handler.get_payload())
 
 	log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, path_to_ciphered_key))
 
@@ -119,6 +225,7 @@ def decipher(path_to_key, password):
 	log.debug("deciphering '%s'" % path_to_key)
 	
 	key_ciphered = try_open(path_to_key, True)
+	key_size = len(key_ciphered)
 
 	nonce = key_ciphered[:8]
 	key = key_ciphered[8:]
@@ -141,18 +248,73 @@ def decipher(path_to_key, password):
 	else:
 		log.debug("password ok")
 
-	key_path = obfuscate(decrypted_key)
-	key_path_length = len(key_path)
-	print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
-	print(os.path.abspath(key_path) + "\n" + "=" * key_path_length)
+	if arguments.output:
+		if arguments.output == '-':
+			if not is_bytes(decrypted_key):
+				sys.stdout.write(decrypted_key)
+
+			else:
+				sys.stdout.buffer.write(decrypted_key)
+				# writing bytes
+
+		else:
+			log.warning("THE KEY WON'T BE AUTOMATICALLY CLEANED UP - keep that in mind")
+			write_key_to_file(decrypted_key)
+
+	else:
+		key_path = obfuscate(decrypted_key)
+		key_path_length = len(key_path)
+		print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
+		print(os.path.abspath(key_path) + "\n" + "=" * key_path_length)
+		try:
+			input()
+		except (KeyboardInterrupt, EOFError):
+			log.info("interrupted by user")
+		except Exception as e:
+			log.exception(e)
+		finally:
+			cleanup(key_path)
+
+def write_key_to_file(path, key):
+	# unlike obfuscate() func
+	# this one doesnt delete the
+	# file when done
+	
+	# shitty code by me:
+	'''
 	try:
-		input()
-	except (KeyboardInterrupt, EOFError):
-		log.info("interrupted by user")
+		if arguments.bytes:
+			file = open(path, "wb")
+
+			if is_bytes(key):
+				file.write(key)
+
+			else:
+				file.write(bytes(key, "utf-8"))
+			
+		else:
+			file = open(path, "w")
+			if is_bytes(key):
+				file.write(key.decode("utf-8"))
+
+			else:
+				file.write(key)
+	'''
+	# normal code powered by chatgpt
+	try:
+		mode = "wb" if arguments.bytes else "w"
+
+		with open(path, mode) as file:
+			if arguments.bytes:
+				file.write(key if is_bytes(key) else key.ecnode("utf-8"))
+			else:
+				file.write(key if not is_bytes(key) else key.decode("utf-8"))
+
+	except OSError as e:
+		log.error(e)
+
 	except Exception as e:
 		log.exception(e)
-	finally:
-		cleanup(key_path)
 
 
 def obfuscate(key):
@@ -179,8 +341,7 @@ def obfuscate(key):
 
 	try:
 
-		with open(path, "w") as file:
-			file.write(key)
+		write_key_to_file(path, key)
 
 	except OSError as error:
 		if error.errno == 13:
@@ -205,11 +366,9 @@ def obfuscate(key):
 
 
 def cleanup(key_path):
-	return_code = subprocess.run(["shred", key_path]).returncode
-	if return_code:
-		log.debug("return code of shred: %d" % return_code)
+	if subprocess.run(["shred", key_path]).returncode:
 		with open(key_path, "wb") as file:
-			file.write(random.randbytes(5000))
+			file.write(random.randbytes(key_size))
 
 	os.remove(key_path)
 
@@ -217,7 +376,12 @@ def cleanup(key_path):
 
 
 if __name__ == '__main__':
-	password = get_password()
+	if os.path.exists(PATH):
+		password = get_password()
+
+	else:
+		log.info("'%s' not found, specify the key path via -k switch" % PATH)
+		exit(1)
 
 	if arguments.cipher:
 		cipher(PATH, password)
