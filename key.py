@@ -31,6 +31,12 @@ arguments = parser.parse_args()
 PATH = "~/keys/id_rsa.ciphered" if not arguments.key else arguments.key
 PATH = os.path.expanduser(PATH)
 ALPHABET = string.ascii_letters + string.digits
+globdkLen = 32
+# key deriviation length for PBKDF2
+globiterations = 1_000_000
+# iterations for the same reason
+
+# FUCKING MESS
 
 # for debugging the code when its imported
 # written this by mysels, thats why it so shit.
@@ -70,8 +76,8 @@ class KeyHandlerPayload:
 	# setting all to None to have an ability to get_key() without supplying extra info
 	def __init__(self, data=None, password=None, nonce=None, salt=None):
 		self.password = password
-		self.dkLen = 32
-		self.iterations = 1_000_000
+		self.dkLen = globdkLen
+		self.iterations = globiterations
 		self.nonce = nonce
 		self.salt = salt
 		self.data = data
@@ -115,6 +121,9 @@ class KeyHandlerVerify:
 	def __init__(self, password, payload):
 		self.password = password
 		self.payload = payload
+		self.dkLen = globdkLen
+		self.iterations = globiterations
+		self._get_fields()
 
 	def _get_fields(self):
 		self.nonce = self.payload[:8] # for nonce
@@ -123,8 +132,6 @@ class KeyHandlerVerify:
 		self.payload_hmac = self.payload[-32:] # payload hmac
 
 	def verify_payload(self):
-		self._get_fields()
-
 		self.key_handler_payload = KeyHandlerPayload(
 			nonce=self.nonce,
 			data=self.read_payload, 
@@ -141,6 +148,13 @@ class KeyHandlerVerify:
 
 		else:
 			log.info("payload hash ok")
+
+	# FUCKING AWFUL, I KNOW, BUT DONT REALLY CARE FOR NOW
+	def get_key(self):
+		self.key = PBKDF2(self.password, self.salt, dkLen=self.dkLen, count=self.iterations)
+		log.debug("key generation ok")
+
+		return self.key
 
 # === 	END KEY HANDLING 	===
 
@@ -175,8 +189,10 @@ def handle_password(password, exit_on_failure=False):
 def try_open(path_to_key, read_bytes=False):
 	try:
 		log.debug("bytes: " + str(arguments.bytes))
-		with open(path_to_key, "r" if not arguments.bytes else "rb") as file:
-			data = bytes(file.read(), "utf-8") if not arguments.bytes else file.read()
+		mode = "r" if not arguments.bytes and arguments.cipher else "rb"
+		log.debug("mode: " + mode)
+		with open(path_to_key, mode) as file:
+			data = bytes(file.read(), "utf-8") if mode == "r" else file.read()
 
 	except UnicodeDecodeError:
 		log.critical("file '%s' is bytes, can't decode, use -b for bytes" % path_to_key)
@@ -216,10 +232,20 @@ def cipher(path_to_key, password):
 
 	# no error checking, will do later
 	path_to_ciphered_key = path_to_key + ".ciphered"
-	with open(path_to_ciphered_key, "wb") as file:
-		file.write(key_handler.get_payload())
 
-	log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, path_to_ciphered_key))
+	encrypted_key = key_handler.get_payload()
+
+	_path = path_to_ciphered_key
+	
+	if arguments.output:
+		_path = arguments.output
+		if _path == '-':
+			sys.stdout.buffer.write(encrypted_key)
+
+		else:
+			write_key_to_file(_path, encrypted_key)
+
+	log.info("successfully ciphered '%s' key: '%s'" % (path_to_key, _path))
 
 def decipher(path_to_key, password):
 	log.debug("deciphering '%s'" % path_to_key)
@@ -227,9 +253,16 @@ def decipher(path_to_key, password):
 	key_ciphered = try_open(path_to_key, True)
 	key_size = len(key_ciphered)
 
-	nonce = key_ciphered[:8]
-	key = key_ciphered[8:]
-	decipher = Salsa20.new(pad(password, 16), nonce)
+	# nonce = key_ciphered[:8]
+	# key = key_ciphered[8:]
+
+	key_verify = KeyHandlerVerify(password=password, payload=key_ciphered)
+	key_verify.verify_payload()
+
+	decipher = Salsa20.new(key=key_verify.get_key(), nonce=key_verify.nonce)
+
+	key = key_verify.read_payload
+
 	try:
 		decrypted_key = decipher.decrypt(key).decode("utf-8") if not arguments.bytes else \
 		decipher.decrypt(key)
@@ -248,6 +281,7 @@ def decipher(path_to_key, password):
 	else:
 		log.debug("password ok")
 
+	log.debug("output option: " + arguments.output)
 	if arguments.output:
 		if arguments.output == '-':
 			if not is_bytes(decrypted_key):
@@ -259,7 +293,7 @@ def decipher(path_to_key, password):
 
 		else:
 			log.warning("THE KEY WON'T BE AUTOMATICALLY CLEANED UP - keep that in mind")
-			write_key_to_file(decrypted_key)
+			write_key_to_file(arguments.output, decrypted_key)
 
 	else:
 		key_path = obfuscate(decrypted_key)
@@ -302,7 +336,7 @@ def write_key_to_file(path, key):
 	'''
 	# normal code powered by chatgpt
 	try:
-		mode = "wb" if arguments.bytes else "w"
+		mode = "wb" if arguments.bytes or arguments.cipher else "w"
 
 		with open(path, mode) as file:
 			if arguments.bytes:
