@@ -210,11 +210,49 @@ class Logger:
 		return logger
 
 # qlogger.py end
+parser = argparse.ArgumentParser(description="program simply takes path to ciphered (with Salsa20) key, deciphers it, obfuscates and deltes the unciphered key")
 
-if __name__ != "__main__":
-	arguments.verbose = True
+parser.add_argument("key", help="specify a path to a key")
 
-log = Logger(level="debug" if arguments.verbose else "info", color=arguments.no_color).get_logger(os.path.basename(__file__))
+parser.add_argument("-o", "--output", help="set output file (or '-' for stdout)")
+
+parser.add_argument("-c", "--cipher", help="crypt a key with a password", action="store_true")
+parser.add_argument("-b", "--bytes", help="open a file in a bytes-reading form (not a plain text)", action="store_true")
+parser.add_argument("-v", "--verbose", help="verbose, used for debugging in general", action="store_true")
+parser.add_argument("-n", "--no-color", help="disable coloring (used for windows in general)", action="store_false")
+parser.add_argument("-m", "--minimal", help="output only filename (-v option will be ignored if -m is used), no blocking (key will not be cleared upon pressing Enter)", action="store_true")
+
+arguments = parser.parse_args()
+
+PATH = os.path.expanduser(arguments.key)
+ALPHABET = string.ascii_letters + string.digits
+globdkLen = 32
+# key deriviation length for PBKDF2
+globiterations = 1_000_000
+# iterations for the same reason
+if arguments.output:
+	arguments.output = os.path.expanduser(arguments.output)
+
+# FUCKING MESS
+
+# for debugging the code when its imported
+# written this by mysels, thats why it so shit.
+# OH MY FUCKING GOD ITS SO SHIT, but works for me.
+
+# forget about it, fixed it, now it looks slim and nice. :)
+# if __name__ != "__main__":
+# 	arguments.verbose = True
+
+if arguments.minimal:
+	lvl = "critical"
+
+elif arguments.verbose:
+	lvl = "debug"
+
+else:
+	lvl = "info"
+
+log = qlogger.Logger(level=lvl, color=arguments.no_color).get_logger(os.path.basename(__file__))
 
 
 def get_password(prompt="Password:"):
@@ -465,16 +503,23 @@ def decipher(path_to_key, password):
 	else:
 		key_path = obfuscate(decrypted_key)
 		key_path_length = len(key_path)
-		print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
-		print(os.path.abspath(key_path) + "\n" + "=" * key_path_length)
-		try:
-			input()
-		except (KeyboardInterrupt, EOFError):
-			log.info("interrupted by user")
-		except Exception as e:
-			log.exception(e)
-		finally:
-			cleanup(key_path)
+		if not arguments.minimal:
+
+			print("here is temporary path to a key, please press enter when you logged in:\n" + "=" * key_path_length)
+			print(os.path.abspath(key_path) + "\n" + "=" * key_path_length)
+
+			try:
+				input()
+			except (KeyboardInterrupt, EOFError):
+				log.info("interrupted by user")
+			except Exception as e:
+				log.exception(e)
+			finally:
+				cleanup(key_path)
+
+		else:
+			print(os.path.abspath(key_path), end="")
+
 
 def write_key_to_file(path, key):
 	# unlike obfuscate() func
