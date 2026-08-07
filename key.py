@@ -23,7 +23,6 @@ parser.add_argument("key", help="specify a path to a key")
 parser.add_argument("-o", "--output", help="set output file (or '-' for stdout)")
 
 parser.add_argument("-c", "--cipher", help="crypt a key with a password", action="store_true")
-parser.add_argument("-b", "--bytes", help="open a file in a bytes-reading form (not a plain text)", action="store_true")
 parser.add_argument("-v", "--verbose", help="verbose, used for debugging in general", action="store_true")
 parser.add_argument("-n", "--no-color", help="disable coloring (used for windows in general)", action="store_false")
 parser.add_argument("-m", "--minimal", help="output only filename (-v option will be ignored if -m is used), no blocking (key will not be cleared upon pressing Enter)", action="store_true")
@@ -200,14 +199,11 @@ def handle_password(password, exit_on_failure=False):
 
 def try_open(path_to_key, read_bytes=False):
 	try:
-		log.debug("bytes: " + str(arguments.bytes))
-		mode = "r" if not arguments.bytes and arguments.cipher else "rb"
-		log.debug("mode: " + mode)
-		with open(path_to_key, mode) as file:
-			data = bytes(file.read(), "utf-8") if mode == "r" else file.read()
+		with open(path_to_key, "rb") as file:
+			data = file.read()
 
 	except UnicodeDecodeError:
-		log.critical("file '%s' is bytes, can't decode, use -b for bytes" % path_to_key)
+		log.critical("deprecated")
 		exit(1)
 
 	except OSError as error:
@@ -275,8 +271,7 @@ def decipher(path_to_key, password):
 	key = key_verify.read_payload
 
 	try:
-		decrypted_key = decipher.decrypt(key).decode("utf-8") if not arguments.bytes else \
-		decipher.decrypt(key)
+		decrypted_key = decipher.decrypt(key)
 
 	except UnicodeDecodeError as e:
 		log.critical("failed to decode (maybe because of incorrect password), program aborted")
@@ -354,13 +349,11 @@ def write_key_to_file(path, key):
 	'''
 	# normal code powered by chatgpt
 	try:
-		mode = "wb" if arguments.bytes or arguments.cipher else "w"
-
-		with open(path, mode) as file:
-			if arguments.bytes or arguments.cipher:
-				file.write(key if is_bytes(key) else key.ecnode("utf-8"))
+		with open(path, "wb") as file:
+			if arguments.cipher:
+				file.write(key)
 			else:
-				file.write(key if not is_bytes(key) else key.decode("utf-8"))
+				file.write(key)
 
 	except OSError as e:
 		log.error(e)
@@ -415,7 +408,7 @@ def obfuscate(key):
 	# for some reason i think this will be more clear
 
 	return path
-
+ 
 
 def cleanup(key_path):
 	if subprocess.run(["shred", key_path]).returncode:
